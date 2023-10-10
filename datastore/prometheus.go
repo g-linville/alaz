@@ -24,7 +24,6 @@ type PrometheusExporter struct {
 
 	latencyHistogram *prometheus.HistogramVec
 	statusCounter    *prometheus.CounterVec
-	bytesSentCounter *prometheus.CounterVec
 
 	podCache *eventCache
 	svcCache *eventCache
@@ -60,9 +59,6 @@ func (c *eventCache) set(uid string, e IEvent) {
 }
 
 func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
-	// TODO - why is this needed? if it is needed, replace it with something that isn't deprecated
-	// rand.Seed(time.Now().UnixNano())
-
 	exporter := &PrometheusExporter{
 		ctx:           ctx,
 		reg:           prometheus.NewRegistry(),
@@ -95,17 +91,6 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 			"toAcornProject", "toAcornApp", "toAcornContainer", "toAcornAccountId"},
 	)
 	exporter.reg.MustRegister(exporter.statusCounter)
-
-	exporter.bytesSentCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "alaz",
-			Name:      "bytes_sent",
-		},
-		[]string{"fromPod", "fromNamespace", "toPod", "toNamespace", "toHost", "toPort", "toService",
-			"fromAcornProject", "fromAcornApp", "fromAcornContainer", "fromAcornAccountId",
-			"toAcornProject", "toAcornApp", "toAcornContainer", "toAcornAccountId"},
-	)
-	exporter.reg.MustRegister(exporter.bytesSentCounter)
 
 	// Set up caches
 	go exporter.startCache(exporter.podCache, exporter.podEventChan)
@@ -210,24 +195,6 @@ func (p *PrometheusExporter) updateMetricsToPod(fromPod, toPod *PodEvent, req Re
 		"toAcornContainer":   toPod.Labels[containerLabel],
 		"toAcornAccountId":   toPod.Labels[accountIdLabel],
 	}).Inc()
-
-	p.bytesSentCounter.With(prometheus.Labels{
-		"fromPod":            fromPod.Name,
-		"fromNamespace":      fromPod.Namespace,
-		"toPod":              toPod.Name,
-		"toNamespace":        toPod.Namespace,
-		"toService":          "",
-		"toHost":             "",
-		"toPort":             strconv.Itoa(int(req.ToPort)),
-		"fromAcornProject":   fromPod.Labels[projectLabel],
-		"fromAcornApp":       fromPod.Labels[appLabel],
-		"fromAcornContainer": fromPod.Labels[containerLabel],
-		"fromAcornAccountId": fromPod.Labels[accountIdLabel],
-		"toAcornProject":     toPod.Labels[projectLabel],
-		"toAcornApp":         toPod.Labels[appLabel],
-		"toAcornContainer":   toPod.Labels[containerLabel],
-		"toAcornAccountId":   toPod.Labels[accountIdLabel],
-	}).Add(float64(req.Size))
 }
 
 func (p *PrometheusExporter) updateMetricsToSvc(fromPod *PodEvent, toSvc *SvcEvent, req Request) {
@@ -267,24 +234,6 @@ func (p *PrometheusExporter) updateMetricsToSvc(fromPod *PodEvent, toSvc *SvcEve
 		"toAcornContainer":   "",
 		"toAcornAccountId":   "",
 	}).Inc()
-
-	p.bytesSentCounter.With(prometheus.Labels{
-		"fromPod":            fromPod.Name,
-		"fromNamespace":      fromPod.Namespace,
-		"toService":          toSvc.Name,
-		"toNamespace":        toSvc.Namespace,
-		"toPod":              "",
-		"toHost":             "",
-		"toPort":             strconv.Itoa(int(req.ToPort)),
-		"fromAcornProject":   fromPod.Labels[projectLabel],
-		"fromAcornApp":       fromPod.Labels[appLabel],
-		"fromAcornContainer": fromPod.Labels[containerLabel],
-		"fromAcornAccountId": fromPod.Labels[accountIdLabel],
-		"toAcornProject":     "",
-		"toAcornApp":         "",
-		"toAcornContainer":   "",
-		"toAcornAccountId":   "",
-	}).Add(float64(req.Size))
 }
 
 func (p *PrometheusExporter) updateMetricsToOutbound(fromPod *PodEvent, req Request) {
@@ -324,24 +273,6 @@ func (p *PrometheusExporter) updateMetricsToOutbound(fromPod *PodEvent, req Requ
 		"toAcornContainer":   "",
 		"toAcornAccountId":   "",
 	}).Inc()
-
-	p.bytesSentCounter.With(prometheus.Labels{
-		"fromPod":            fromPod.Name,
-		"fromNamespace":      fromPod.Namespace,
-		"toHost":             req.ToUID, // req.ToUID is the website hostname in this case, i.e. google.com
-		"toService":          "",
-		"toPod":              "",
-		"toNamespace":        "",
-		"toPort":             strconv.Itoa(int(req.ToPort)),
-		"fromAcornProject":   fromPod.Labels[projectLabel],
-		"fromAcornApp":       fromPod.Labels[appLabel],
-		"fromAcornContainer": fromPod.Labels[containerLabel],
-		"fromAcornAccountId": fromPod.Labels[accountIdLabel],
-		"toAcornProject":     "",
-		"toAcornApp":         "",
-		"toAcornContainer":   "",
-		"toAcornAccountId":   "",
-	}).Add(float64(req.Size))
 }
 
 func (p *PrometheusExporter) PersistRequest(request Request) error {
