@@ -15,7 +15,6 @@ import (
 
 	"github.com/ddosify/alaz/log"
 
-	"net/http"
 	_ "net/http/pprof"
 )
 
@@ -57,7 +56,7 @@ func main() {
 		a.Run()
 	}
 
-	go http.ListenAndServe(":8181", nil)
+	//go http.ListenAndServe(":8181", nil)
 
 	<-k8sCollector.Done()
 	log.Logger.Info().Msg("k8sCollector done")
