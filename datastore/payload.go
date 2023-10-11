@@ -20,7 +20,7 @@ type EventPayload struct {
 	Events   []interface{} `json:"events"`
 }
 
-type IEvent interface {
+type Event interface {
 	GetUID() string
 }
 

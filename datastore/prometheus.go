@@ -29,30 +29,30 @@ type PrometheusExporter struct {
 	svcCache *eventCache
 
 	reqChanBuffer chan Request
-	podEventChan  chan IEvent // *PodEvent
-	svcEventChan  chan IEvent // *SvcEvent
+	podEventChan  chan Event // *PodEvent
+	svcEventChan  chan Event // *SvcEvent
 }
 
 type eventCache struct {
-	c map[string]IEvent
+	c map[string]Event
 	m sync.RWMutex
 }
 
 func newEventCache() *eventCache {
 	return &eventCache{
-		c: make(map[string]IEvent),
+		c: make(map[string]Event),
 		m: sync.RWMutex{},
 	}
 }
 
-func (c *eventCache) get(uid string) (IEvent, bool) {
+func (c *eventCache) get(uid string) (Event, bool) {
 	c.m.RLock()
 	defer c.m.RUnlock()
 	val, ok := c.c[uid]
 	return val, ok
 }
 
-func (c *eventCache) set(uid string, e IEvent) {
+func (c *eventCache) set(uid string, e Event) {
 	c.m.Lock()
 	defer c.m.Unlock()
 	c.c[uid] = e
@@ -65,8 +65,8 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 		podCache:      newEventCache(),
 		svcCache:      newEventCache(),
 		reqChanBuffer: make(chan Request, 10000),
-		podEventChan:  make(chan IEvent, 100),
-		svcEventChan:  make(chan IEvent, 100),
+		podEventChan:  make(chan Event, 100),
+		svcEventChan:  make(chan Event, 100),
 	}
 
 	exporter.latencyHistogram = prometheus.NewHistogramVec(
@@ -111,7 +111,7 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 	return exporter
 }
 
-func (p *PrometheusExporter) startCache(cache *eventCache, ch chan IEvent) {
+func (p *PrometheusExporter) startCache(cache *eventCache, ch chan Event) {
 	for {
 		select {
 		case <-p.ctx.Done():
