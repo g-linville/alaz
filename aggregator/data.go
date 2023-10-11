@@ -423,7 +423,6 @@ func (a *Aggregator) processL7(d l7_req.L7Event) {
 		StatusCode: d.Status,
 		FailReason: "",
 		Method:     d.Method,
-		Size:       d.PayloadSize, // TODO - verify that this works/matches the expected size
 	}
 
 	var reqHostHeader string
