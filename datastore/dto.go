@@ -88,22 +88,24 @@ type Container struct {
 }
 
 type Request struct {
-	StartTime  int64
-	Latency    uint64 // in ns
-	FromIP     string
-	FromType   string
-	FromUID    string
-	FromPort   uint16
-	ToIP       string
-	ToType     string
-	ToUID      string
-	ToPort     uint16
-	Protocol   string
-	Completed  bool
-	StatusCode uint32
-	FailReason string
-	Method     string
-	Path       string
+	StartTime    int64
+	Latency      uint64 // in ns
+	FromIP       string
+	FromType     string
+	FromUID      string
+	FromPort     uint16
+	ToIP         string
+	ToType       string
+	ToUID        string
+	ToPort       uint16
+	Protocol     string
+	Completed    bool
+	StatusCode   uint32
+	FailReason   string
+	Method       string
+	Path         string
+	Size         uint32
+	ResponseSize uint32
 }
 
 type BackendResponse struct {

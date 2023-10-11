@@ -32,6 +32,12 @@ struct trace_event_raw_sys_enter_recvfrom {
     __u64 addr_len;
 };
 
+struct trace_event_raw_sys_enter_close {
+    struct trace_entry ent;
+    __s32 __syscall_nr;
+    __u64 fd;
+};
+
 struct trace_event_raw_sys_exit_read {
     __u64 unused;
     __s32 id;

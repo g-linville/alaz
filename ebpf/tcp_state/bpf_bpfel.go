@@ -61,18 +61,30 @@ type bpfSpecs struct {
 type bpfProgramSpecs struct {
 	InetSockSetState *ebpf.ProgramSpec `ebpf:"inet_sock_set_state"`
 	SysEnterConnect  *ebpf.ProgramSpec `ebpf:"sys_enter_connect"`
+	SysEnterRead     *ebpf.ProgramSpec `ebpf:"sys_enter_read"`
+	SysEnterRecvfrom *ebpf.ProgramSpec `ebpf:"sys_enter_recvfrom"`
+	SysEnterSendto   *ebpf.ProgramSpec `ebpf:"sys_enter_sendto"`
+	SysEnterWrite    *ebpf.ProgramSpec `ebpf:"sys_enter_write"`
 	SysExitConnect   *ebpf.ProgramSpec `ebpf:"sys_exit_connect"`
+	SysExitRead      *ebpf.ProgramSpec `ebpf:"sys_exit_read"`
+	SysExitRecvfrom  *ebpf.ProgramSpec `ebpf:"sys_exit_recvfrom"`
+	SysExitSendto    *ebpf.ProgramSpec `ebpf:"sys_exit_sendto"`
+	SysExitWrite     *ebpf.ProgramSpec `ebpf:"sys_exit_write"`
 }
 
 // bpfMapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type bpfMapSpecs struct {
+	ActiveReadFds    *ebpf.MapSpec `ebpf:"active_read_fds"`
+	ActiveSockets    *ebpf.MapSpec `ebpf:"active_sockets"`
+	ActiveWriteFds   *ebpf.MapSpec `ebpf:"active_write_fds"`
 	FdByPidTgid      *ebpf.MapSpec `ebpf:"fd_by_pid_tgid"`
 	SockMap          *ebpf.MapSpec `ebpf:"sock_map"`
 	SockMapTemp      *ebpf.MapSpec `ebpf:"sock_map_temp"`
 	TcpConnectEvents *ebpf.MapSpec `ebpf:"tcp_connect_events"`
 	TcpListenEvents  *ebpf.MapSpec `ebpf:"tcp_listen_events"`
+	ThroughputInfos  *ebpf.MapSpec `ebpf:"throughput_infos"`
 }
 
 // bpfObjects contains all objects after they have been loaded into the kernel.
@@ -94,20 +106,28 @@ func (o *bpfObjects) Close() error {
 //
 // It can be passed to loadBpfObjects or ebpf.CollectionSpec.LoadAndAssign.
 type bpfMaps struct {
+	ActiveReadFds    *ebpf.Map `ebpf:"active_read_fds"`
+	ActiveSockets    *ebpf.Map `ebpf:"active_sockets"`
+	ActiveWriteFds   *ebpf.Map `ebpf:"active_write_fds"`
 	FdByPidTgid      *ebpf.Map `ebpf:"fd_by_pid_tgid"`
 	SockMap          *ebpf.Map `ebpf:"sock_map"`
 	SockMapTemp      *ebpf.Map `ebpf:"sock_map_temp"`
 	TcpConnectEvents *ebpf.Map `ebpf:"tcp_connect_events"`
 	TcpListenEvents  *ebpf.Map `ebpf:"tcp_listen_events"`
+	ThroughputInfos  *ebpf.Map `ebpf:"throughput_infos"`
 }
 
 func (m *bpfMaps) Close() error {
 	return _BpfClose(
+		m.ActiveReadFds,
+		m.ActiveSockets,
+		m.ActiveWriteFds,
 		m.FdByPidTgid,
 		m.SockMap,
 		m.SockMapTemp,
 		m.TcpConnectEvents,
 		m.TcpListenEvents,
+		m.ThroughputInfos,
 	)
 }
 
@@ -117,14 +137,30 @@ func (m *bpfMaps) Close() error {
 type bpfPrograms struct {
 	InetSockSetState *ebpf.Program `ebpf:"inet_sock_set_state"`
 	SysEnterConnect  *ebpf.Program `ebpf:"sys_enter_connect"`
+	SysEnterRead     *ebpf.Program `ebpf:"sys_enter_read"`
+	SysEnterRecvfrom *ebpf.Program `ebpf:"sys_enter_recvfrom"`
+	SysEnterSendto   *ebpf.Program `ebpf:"sys_enter_sendto"`
+	SysEnterWrite    *ebpf.Program `ebpf:"sys_enter_write"`
 	SysExitConnect   *ebpf.Program `ebpf:"sys_exit_connect"`
+	SysExitRead      *ebpf.Program `ebpf:"sys_exit_read"`
+	SysExitRecvfrom  *ebpf.Program `ebpf:"sys_exit_recvfrom"`
+	SysExitSendto    *ebpf.Program `ebpf:"sys_exit_sendto"`
+	SysExitWrite     *ebpf.Program `ebpf:"sys_exit_write"`
 }
 
 func (p *bpfPrograms) Close() error {
 	return _BpfClose(
 		p.InetSockSetState,
 		p.SysEnterConnect,
+		p.SysEnterRead,
+		p.SysEnterRecvfrom,
+		p.SysEnterSendto,
+		p.SysEnterWrite,
 		p.SysExitConnect,
+		p.SysExitRead,
+		p.SysExitRecvfrom,
+		p.SysExitSendto,
+		p.SysExitWrite,
 	)
 }
 

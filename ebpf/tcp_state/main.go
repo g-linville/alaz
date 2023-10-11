@@ -88,6 +88,19 @@ func (e TcpConnectEvent) Type() string {
 	return TCP_CONNECT_EVENT
 }
 
+type ThroughputInfo struct {
+	Pid           uint32
+	Fd            uint64
+	BytesSent     uint64
+	BytesReceived uint64
+}
+
+const THROUGHPUT_INFO = "throughput_info"
+
+func (i ThroughputInfo) Type() string {
+	return THROUGHPUT_INFO
+}
+
 // returns when program is detached
 func DeployAndWait(parentCtx context.Context, ch chan interface{}) {
 	ctx, _ := context.WithCancel(parentCtx)
@@ -135,6 +148,78 @@ func DeployAndWait(parentCtx context.Context, ch chan interface{}) {
 		l2.Close()
 	}()
 
+	l3, err := link.Tracepoint("syscalls", "sys_enter_read", objs.bpfPrograms.SysEnterRead, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_enter_read tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_enter_read tracepoint")
+		l3.Close()
+	}()
+
+	l4, err := link.Tracepoint("syscalls", "sys_exit_read", objs.bpfPrograms.SysExitRead, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_exit_read tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_exit_read tracepoint")
+		l4.Close()
+	}()
+
+	l5, err := link.Tracepoint("syscalls", "sys_enter_recvfrom", objs.bpfPrograms.SysEnterRecvfrom, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_enter_recvfrom tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_enter_recvfrom tracepoint")
+		l5.Close()
+	}()
+
+	l6, err := link.Tracepoint("syscalls", "sys_exit_recvfrom", objs.bpfPrograms.SysExitRecvfrom, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_exit_recvfrom tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_exit_recvfrom tracepoint")
+		l6.Close()
+	}()
+
+	l7, err := link.Tracepoint("syscalls", "sys_enter_write", objs.bpfPrograms.SysEnterWrite, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_enter_write tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_enter_write tracepoint")
+		l7.Close()
+	}()
+
+	l8, err := link.Tracepoint("syscalls", "sys_exit_write", objs.bpfPrograms.SysExitWrite, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_exit_write tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_exit_write tracepoint")
+		l8.Close()
+	}()
+
+	l9, err := link.Tracepoint("syscalls", "sys_enter_sendto", objs.bpfPrograms.SysEnterSendto, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_enter_sendto tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_enter_sendto tracepoint")
+		l9.Close()
+	}()
+
+	l10, err := link.Tracepoint("syscalls", "sys_exit_sendto", objs.bpfPrograms.SysExitSendto, nil)
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("link sys_exit_sendto tracepoint")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing sys_exit_sendto tracepoint")
+		l10.Close()
+	}()
+
 	// initialize perf event readers
 	tcpListenEvents, err := perf.NewReader(objs.TcpListenEvents, 64*os.Getpagesize())
 	if err != nil {
@@ -152,6 +237,15 @@ func DeployAndWait(parentCtx context.Context, ch chan interface{}) {
 	defer func() {
 		log.Logger.Info().Msg("closing tcpConnectEvents perf event reader")
 		tcpConnectEvents.Close()
+	}()
+
+	throughputInfos, err := perf.NewReader(objs.ThroughputInfos, 64*os.Getpagesize())
+	if err != nil {
+		log.Logger.Fatal().Err(err).Msg("error creating perf event reader for throughput infos")
+	}
+	defer func() {
+		log.Logger.Info().Msg("closing throughputInfos perf event reader")
+		throughputInfos.Close()
 	}()
 
 	// go listenDebugMsgs()
@@ -198,6 +292,8 @@ func DeployAndWait(parentCtx context.Context, ch chan interface{}) {
 
 		}
 	}()
+
+	// TODO - also set up goroutine to read throughput infos
 
 	<-ctx.Done() // wait for context to be cancelled
 	readDone <- struct{}{}

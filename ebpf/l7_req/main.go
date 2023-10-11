@@ -310,6 +310,8 @@ func DeployAndWait(parentCtx context.Context, ch chan interface{}) {
 	// function was entered, once per second.
 
 	readDone := make(chan struct{})
+
+	// read l7 events
 	go func() {
 		for {
 			read := func() {

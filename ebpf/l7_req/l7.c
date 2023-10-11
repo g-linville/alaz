@@ -19,10 +19,11 @@
 #define MAX_PAYLOAD_SIZE 512
 #define PAYLOAD_PREFIX_SIZE 16
 
+#define MAX_FDS_PER_PID 8192
+
 // for rabbitmq methods
 #define METHOD_PUBLISH           1
 #define METHOD_DELIVER           2
-
 
 char __license[] SEC("license") = "Dual MIT/GPL";
 
@@ -126,7 +127,6 @@ struct {
 static __always_inline
 int process_enter_of_syscalls_write_sendto(void* ctx, __u64 fd, char* buf, __u64 count){
     __u64 id = bpf_get_current_pid_tgid();
-
     int zero = 0;
     struct l7_request *req = bpf_map_lookup_elem(&l7_request_heap, &zero);
 
@@ -216,7 +216,6 @@ int process_enter_of_syscalls_write_sendto(void* ctx, __u64 fd, char* buf, __u64
 static __always_inline
 int process_enter_of_syscalls_read_recvfrom(__u64 fd, char* buf, __u64 size) {
     __u64 id = bpf_get_current_pid_tgid();
-    
     struct socket_key k = {};
     k.pid = id >> 32;
     k.fd = fd;
@@ -250,7 +249,7 @@ int process_enter_of_syscalls_read_recvfrom(__u64 fd, char* buf, __u64 size) {
 static __always_inline
 int process_exit_of_syscalls_write_sendto(void* ctx, __s64 ret){
     __u64 id = bpf_get_current_pid_tgid();
-
+    
     // we only used this func for amqp, others will only be in active_l7_requests
     // used active_writes for cases that only depends on writes, like amqp publish
     // + postgres statement close, terminate
@@ -337,15 +336,13 @@ int process_exit_of_syscalls_read_recvfrom(void* ctx, __s64 ret) {
         return 0;
     }
 
-
     __u64 id = bpf_get_current_pid_tgid();
+
     struct read_args *read_info = bpf_map_lookup_elem(&active_reads, &id);
     if (!read_info) {
         return 0;
     }
 
-
-    
     struct socket_key k = {};
     k.pid = id >> 32;
     k.fd = read_info->fd; 
@@ -517,4 +514,3 @@ SEC("tracepoint/syscalls/sys_exit_recvfrom")
 int sys_exit_recvfrom(struct trace_event_raw_sys_exit_recvfrom* ctx) {
     return process_exit_of_syscalls_read_recvfrom(ctx, ctx->ret);
 }
-
