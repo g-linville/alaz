@@ -56,8 +56,6 @@ func main() {
 		a.Run()
 	}
 
-	//go http.ListenAndServe(":8181", nil)
-
 	<-k8sCollector.Done()
 	log.Logger.Info().Msg("k8sCollector done")
 

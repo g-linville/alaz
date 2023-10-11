@@ -104,7 +104,6 @@ type Request struct {
 	FailReason string
 	Method     string
 	Path       string
-	Size       uint32 // TODO - figure out the unit (bytes? kb?)
 }
 
 type BackendResponse struct {
