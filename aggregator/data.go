@@ -177,6 +177,7 @@ func (a *Aggregator) processEbpf() {
 				Protocol:            d.Protocol,
 				Method:              d.Method,
 				Payload:             payload,
+				PayloadSize:         d.PayloadSize,
 				PayloadReadComplete: d.PayloadReadComplete,
 				Failed:              d.Failed,
 				WriteTimeNs:         d.WriteTimeNs,
