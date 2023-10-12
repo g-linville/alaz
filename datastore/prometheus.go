@@ -12,11 +12,9 @@ import (
 )
 
 const (
-	projectLabel      = "acorn.io/project-name"
 	appLabel          = "acorn.io/app-public-name"
 	appNamespaceLabel = "acorn.io/app-namespace"
 	containerLabel    = "acorn.io/container-name"
-	accountIdLabel    = "acorn.io/account-id"
 )
 
 type PrometheusExporter struct {
@@ -70,15 +68,17 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 		svcEventChan:  make(chan Event, 100),
 	}
 
+	// Labels to consider using in the future:
+	// fromNamespace, toPod, toNamespace, toHost, toPort, toService, fromAcornProject, fromAcornAccountId,
+	// toAcornProject, toAcornApp, toAcornContainer, toAcornAccountId, toAcornAppNamespace
+
 	exporter.latencyHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: "alaz",
 			Name:      "http_latency",
 			Buckets:   []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000},
 		},
-		[]string{"fromPod", "fromNamespace", "toPod", "toNamespace", "toHost", "toPort", "toService",
-			"fromAcornProject", "fromAcornApp", "fromAcornContainer", "fromAcornAccountId", "fromAcornAppNamespace",
-			"toAcornProject", "toAcornApp", "toAcornContainer", "toAcornAccountId", "toAcornAppNamespace"},
+		[]string{"fromPod", "fromAcornApp", "fromAcornContainer", "fromAcornAppNamespace"},
 	)
 	exporter.reg.MustRegister(exporter.latencyHistogram)
 
@@ -87,9 +87,7 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 			Namespace: "alaz",
 			Name:      "http_status",
 		},
-		[]string{"fromPod", "fromNamespace", "toPod", "toNamespace", "toHost", "toPort", "toService", "status",
-			"fromAcornProject", "fromAcornApp", "fromAcornContainer", "fromAcornAccountId", "fromAcornAppNamespace",
-			"toAcornProject", "toAcornApp", "toAcornContainer", "toAcornAccountId", "toAcornAppNamespace"},
+		[]string{"fromPod", "fromAcornApp", "fromAcornContainer", "fromAcornAppNamespace", "status"},
 	)
 	exporter.reg.MustRegister(exporter.statusCounter)
 
@@ -141,150 +139,23 @@ func (p *PrometheusExporter) handleReq(req Request) {
 		return
 	}
 
-	switch req.ToType {
-	case "pod":
-		toPod, found := p.podCache.get(req.ToUID)
-		if !found {
-			return
-		}
-		p.updateMetricsToPod(fromPod.(*PodEvent), toPod.(*PodEvent), req)
-	case "service":
-		toSvc, found := p.svcCache.get(req.ToUID)
-		if !found {
-			return
-		}
-		p.updateMetricsToSvc(fromPod.(*PodEvent), toSvc.(*SvcEvent), req)
-	case "outbound":
-		p.updateMetricsToOutbound(fromPod.(*PodEvent), req)
-	}
+	p.updateMetrics(fromPod.(*PodEvent), req)
 }
 
-func (p *PrometheusExporter) updateMetricsToPod(fromPod, toPod *PodEvent, req Request) {
+func (p *PrometheusExporter) updateMetrics(fromPod *PodEvent, req Request) {
 	p.latencyHistogram.With(prometheus.Labels{
 		"fromPod":               fromPod.Name,
-		"fromNamespace":         fromPod.Namespace,
-		"toPod":                 toPod.Name,
-		"toNamespace":           toPod.Namespace,
-		"toService":             "",
-		"toHost":                "",
-		"toPort":                strconv.Itoa(int(req.ToPort)),
-		"fromAcornProject":      fromPod.Labels[projectLabel],
 		"fromAcornApp":          fromPod.Labels[appLabel],
 		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
 		"fromAcornContainer":    fromPod.Labels[containerLabel],
-		"fromAcornAccountId":    fromPod.Labels[accountIdLabel],
-		"toAcornProject":        toPod.Labels[projectLabel],
-		"toAcornApp":            toPod.Labels[appLabel],
-		"toAcornAppNamespace":   toPod.Labels[appNamespaceLabel],
-		"toAcornContainer":      toPod.Labels[containerLabel],
-		"toAcornAccountId":      toPod.Labels[accountIdLabel],
 	}).Observe(float64(req.Latency) / float64(1000000)) // divide by 1 million to convert nanoseconds to milliseconds
 
 	p.statusCounter.With(prometheus.Labels{
 		"fromPod":               fromPod.Name,
-		"fromNamespace":         fromPod.Namespace,
-		"toPod":                 toPod.Name,
-		"toNamespace":           toPod.Namespace,
-		"toService":             "",
-		"toHost":                "",
-		"toPort":                strconv.Itoa(int(req.ToPort)),
 		"status":                strconv.Itoa(int(req.StatusCode)),
-		"fromAcornProject":      fromPod.Labels[projectLabel],
 		"fromAcornApp":          fromPod.Labels[appLabel],
 		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
 		"fromAcornContainer":    fromPod.Labels[containerLabel],
-		"fromAcornAccountId":    fromPod.Labels[accountIdLabel],
-		"toAcornProject":        toPod.Labels[projectLabel],
-		"toAcornApp":            toPod.Labels[appLabel],
-		"toAcornAppNamespace":   toPod.Labels[appNamespaceLabel],
-		"toAcornContainer":      toPod.Labels[containerLabel],
-		"toAcornAccountId":      toPod.Labels[accountIdLabel],
-	}).Inc()
-}
-
-func (p *PrometheusExporter) updateMetricsToSvc(fromPod *PodEvent, toSvc *SvcEvent, req Request) {
-	p.latencyHistogram.With(prometheus.Labels{
-		"fromPod":               fromPod.Name,
-		"fromNamespace":         fromPod.Namespace,
-		"toService":             toSvc.Name,
-		"toNamespace":           toSvc.Namespace,
-		"toPod":                 "",
-		"toHost":                "",
-		"toPort":                strconv.Itoa(int(req.ToPort)),
-		"fromAcornProject":      fromPod.Labels[projectLabel],
-		"fromAcornApp":          fromPod.Labels[appLabel],
-		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
-		"fromAcornContainer":    fromPod.Labels[containerLabel],
-		"fromAcornAccountId":    fromPod.Labels[accountIdLabel],
-		"toAcornProject":        "",
-		"toAcornApp":            "",
-		"toAcornAppNamespace":   "",
-		"toAcornContainer":      "",
-		"toAcornAccountId":      "",
-	}).Observe(float64(req.Latency) / float64(1000000)) // divide by 1 million to convert nanoseconds to milliseconds
-
-	p.statusCounter.With(prometheus.Labels{
-		"fromPod":               fromPod.Name,
-		"fromNamespace":         fromPod.Namespace,
-		"toService":             toSvc.Name,
-		"toNamespace":           toSvc.Namespace,
-		"toPod":                 "",
-		"toHost":                "",
-		"toPort":                strconv.Itoa(int(req.ToPort)),
-		"status":                strconv.Itoa(int(req.StatusCode)),
-		"fromAcornProject":      fromPod.Labels[projectLabel],
-		"fromAcornApp":          fromPod.Labels[appLabel],
-		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
-		"fromAcornContainer":    fromPod.Labels[containerLabel],
-		"fromAcornAccountId":    fromPod.Labels[accountIdLabel],
-		"toAcornProject":        "",
-		"toAcornApp":            "",
-		"toAcornAppNamespace":   "",
-		"toAcornContainer":      "",
-		"toAcornAccountId":      "",
-	}).Inc()
-}
-
-func (p *PrometheusExporter) updateMetricsToOutbound(fromPod *PodEvent, req Request) {
-	p.latencyHistogram.With(prometheus.Labels{
-		"fromPod":               fromPod.Name,
-		"fromNamespace":         fromPod.Namespace,
-		"toHost":                req.ToUID, // req.ToUID is the website hostname in this case, i.e. google.com
-		"toService":             "",
-		"toPod":                 "",
-		"toNamespace":           "",
-		"toPort":                strconv.Itoa(int(req.ToPort)),
-		"fromAcornProject":      fromPod.Labels[projectLabel],
-		"fromAcornApp":          fromPod.Labels[appLabel],
-		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
-		"fromAcornContainer":    fromPod.Labels[containerLabel],
-		"fromAcornAccountId":    fromPod.Labels[accountIdLabel],
-		"toAcornProject":        "",
-		"toAcornApp":            "",
-		"toAcornAppNamespace":   "",
-		"toAcornContainer":      "",
-		"toAcornAccountId":      "",
-	}).Observe(float64(req.Latency) / float64(1000000)) // divide by 1 million to convert nanoseconds to milliseconds
-
-	p.statusCounter.With(prometheus.Labels{
-		"fromPod":               fromPod.Name,
-		"fromNamespace":         fromPod.Namespace,
-		"toHost":                req.ToUID, // req.ToUID is the website hostname in this case, i.e. google.com
-		"toService":             "",
-		"toPod":                 "",
-		"toNamespace":           "",
-		"toPort":                strconv.Itoa(int(req.ToPort)),
-		"status":                strconv.Itoa(int(req.StatusCode)),
-		"fromAcornProject":      fromPod.Labels[projectLabel],
-		"fromAcornApp":          fromPod.Labels[appLabel],
-		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
-		"fromAcornContainer":    fromPod.Labels[containerLabel],
-		"fromAcornAccountId":    fromPod.Labels[accountIdLabel],
-		"toAcornProject":        "",
-		"toAcornApp":            "",
-		"toAcornAppNamespace":   "",
-		"toAcornContainer":      "",
-		"toAcornAccountId":      "",
 	}).Inc()
 }
 
