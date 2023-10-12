@@ -69,8 +69,8 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 	}
 
 	// Labels to consider using in the future:
-	// fromNamespace, toPod, toNamespace, toHost, toPort, toService, fromAcornProject, fromAcornAccountId,
-	// toAcornProject, toAcornApp, toAcornContainer, toAcornAccountId, toAcornAppNamespace
+	// fromPod, fromNamespace, fromAcornProject, fromAcornApp, fromAcornAppNamespace, fromAcornContainer, fromAcornAccountId,
+	// toNamespace, toHost, toPort, toService, toAcornProject, toAcornAccountId
 
 	exporter.latencyHistogram = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -78,7 +78,7 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 			Name:      "http_latency",
 			Buckets:   []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000},
 		},
-		[]string{"fromPod", "fromAcornApp", "fromAcornContainer", "fromAcornAppNamespace"},
+		[]string{"toPod", "toAcornApp", "toAcornContainer", "toAcornAppNamespace"},
 	)
 	exporter.reg.MustRegister(exporter.latencyHistogram)
 
@@ -87,7 +87,7 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 			Namespace: "alaz",
 			Name:      "http_status",
 		},
-		[]string{"fromPod", "fromAcornApp", "fromAcornContainer", "fromAcornAppNamespace", "status"},
+		[]string{"toPod", "toAcornApp", "toAcornContainer", "toAcornAppNamespace", "status"},
 	)
 	exporter.reg.MustRegister(exporter.statusCounter)
 
@@ -133,29 +133,28 @@ func (p *PrometheusExporter) handleReqs() {
 }
 
 func (p *PrometheusExporter) handleReq(req Request) {
-	fromPod, found := p.podCache.get(req.FromUID)
-	if !found {
-		log.Logger.Warn().Str("uid", req.FromUID).Msg("pod not found")
-		return
+	if req.ToType == "pod" {
+		toPod, found := p.podCache.get(req.ToUID)
+		if found {
+			p.updateMetrics(toPod.(*PodEvent), req)
+		}
 	}
-
-	p.updateMetrics(fromPod.(*PodEvent), req)
 }
 
-func (p *PrometheusExporter) updateMetrics(fromPod *PodEvent, req Request) {
+func (p *PrometheusExporter) updateMetrics(toPod *PodEvent, req Request) {
 	p.latencyHistogram.With(prometheus.Labels{
-		"fromPod":               fromPod.Name,
-		"fromAcornApp":          fromPod.Labels[appLabel],
-		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
-		"fromAcornContainer":    fromPod.Labels[containerLabel],
+		"toPod":               toPod.Name,
+		"toAcornApp":          toPod.Labels[appLabel],
+		"toAcornAppNamespace": toPod.Labels[appNamespaceLabel],
+		"toAcornContainer":    toPod.Labels[containerLabel],
 	}).Observe(float64(req.Latency) / float64(1000000)) // divide by 1 million to convert nanoseconds to milliseconds
 
 	p.statusCounter.With(prometheus.Labels{
-		"fromPod":               fromPod.Name,
-		"status":                strconv.Itoa(int(req.StatusCode)),
-		"fromAcornApp":          fromPod.Labels[appLabel],
-		"fromAcornAppNamespace": fromPod.Labels[appNamespaceLabel],
-		"fromAcornContainer":    fromPod.Labels[containerLabel],
+		"toPod":               toPod.Name,
+		"status":              strconv.Itoa(int(req.StatusCode)),
+		"toAcornApp":          toPod.Labels[appLabel],
+		"toAcornAppNamespace": toPod.Labels[appNamespaceLabel],
+		"toAcornContainer":    toPod.Labels[containerLabel],
 	}).Inc()
 }
 
