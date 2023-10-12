@@ -124,12 +124,12 @@ func (p *PrometheusExporter) handleReq(req Request) {
 	if req.ToType == "pod" {
 		toPod, found := p.podCache.get(req.ToUID)
 		if found {
-			p.updateMetrics(toPod.(*PodEvent), req)
+			p.updateMetrics(toPod.(PodEvent), req)
 		}
 	}
 }
 
-func (p *PrometheusExporter) updateMetrics(toPod *PodEvent, req Request) {
+func (p *PrometheusExporter) updateMetrics(toPod PodEvent, req Request) {
 	p.latencyHistogram.With(prometheus.Labels{
 		"toPod":               toPod.Name,
 		"toAcornApp":          toPod.Labels[appLabel],
