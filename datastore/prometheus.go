@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/ddosify/alaz/aggregator"
 	"github.com/ddosify/alaz/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,8 +29,6 @@ type PrometheusExporter struct {
 	svcCache *eventCache
 
 	reqChanBuffer chan Request
-	podEventChan  chan Event // *PodEvent
-	svcEventChan  chan Event // *SvcEvent
 }
 
 type eventCache struct {
@@ -57,6 +56,12 @@ func (c *eventCache) set(uid string, e Event) {
 	c.c[uid] = e
 }
 
+func (c *eventCache) delete(uid string) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	delete(c.c, uid)
+}
+
 func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 	exporter := &PrometheusExporter{
 		ctx:           ctx,
@@ -64,8 +69,6 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 		podCache:      newEventCache(),
 		svcCache:      newEventCache(),
 		reqChanBuffer: make(chan Request, 10000),
-		podEventChan:  make(chan Event, 100),
-		svcEventChan:  make(chan Event, 100),
 	}
 
 	// Labels to consider using in the future:
@@ -91,9 +94,6 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 	)
 	exporter.reg.MustRegister(exporter.statusCounter)
 
-	// Set up caches
-	go exporter.startCache(exporter.podCache, exporter.podEventChan)
-	go exporter.startCache(exporter.svcCache, exporter.svcEventChan)
 	go exporter.handleReqs()
 
 	go func() {
@@ -108,17 +108,6 @@ func NewPrometheusExporter(ctx context.Context) *PrometheusExporter {
 	}()
 
 	return exporter
-}
-
-func (p *PrometheusExporter) startCache(cache *eventCache, ch chan Event) {
-	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		case obj := <-ch:
-			cache.set(obj.GetUID(), obj)
-		}
-	}
 }
 
 func (p *PrometheusExporter) handleReqs() {
@@ -164,14 +153,22 @@ func (p *PrometheusExporter) PersistRequest(request Request) error {
 }
 
 func (p *PrometheusExporter) PersistPod(pod Pod, eventType string) error {
-	podEvent := convertPodToPodEvent(pod, eventType)
-	p.podEventChan <- &podEvent
+	if eventType == aggregator.DELETE {
+		p.podCache.delete(pod.UID)
+	} else {
+		podEvent := convertPodToPodEvent(pod, eventType)
+		p.podCache.set(pod.UID, podEvent)
+	}
 	return nil
 }
 
 func (p *PrometheusExporter) PersistService(service Service, eventType string) error {
-	svcEvent := convertSvcToSvcEvent(service, eventType)
-	p.svcEventChan <- &svcEvent
+	if eventType == aggregator.DELETE {
+		p.svcCache.delete(service.UID)
+	} else {
+		svcEvent := convertSvcToSvcEvent(service, eventType)
+		p.svcCache.set(service.UID, svcEvent)
+	}
 	return nil
 }
 
