@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ddosify/alaz/aggregator"
 	"github.com/ddosify/alaz/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -153,7 +152,7 @@ func (p *PrometheusExporter) PersistRequest(request Request) error {
 }
 
 func (p *PrometheusExporter) PersistPod(pod Pod, eventType string) error {
-	if eventType == aggregator.DELETE {
+	if eventType == "DELETE" {
 		p.podCache.delete(pod.UID)
 	} else {
 		podEvent := convertPodToPodEvent(pod, eventType)
@@ -163,7 +162,7 @@ func (p *PrometheusExporter) PersistPod(pod Pod, eventType string) error {
 }
 
 func (p *PrometheusExporter) PersistService(service Service, eventType string) error {
-	if eventType == aggregator.DELETE {
+	if eventType == "DELETE" {
 		p.svcCache.delete(service.UID)
 	} else {
 		svcEvent := convertSvcToSvcEvent(service, eventType)
